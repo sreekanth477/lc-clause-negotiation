@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  name         String
+  role         UserRole    @default(TRADE_RM)
+  passwordHash String
+  lcSessions   LCSession[]
+  feedbacks    Feedback[]
+  createdAt    DateTime    @default(now())
+}
+
+enum UserRole {
+  TRADE_RM
+  COMPLIANCE_OFFICER
+  ADMIN
+}
+
+model LCSession {
+  id              String        @id @default(uuid())
+  referenceNumber String        @unique
+  applicantName   String
+  lcType          LCType
+  status          SessionStatus @default(IN_REVIEW)
+  rawText         String        @db.Text
+  officer         User          @relation(fields: [officerId], references: [id])
+  officerId       String
+  clauses         Clause[]
+  auditLogs       AuditLog[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+enum LCType {
+  SIGHT
+  USANCE
+  STANDBY
+  REVOLVING
+  RED_CLAUSE
+  TRANSFERABLE
+}
+
+enum SessionStatus {
+  PARSING
+  IN_REVIEW
+  ESCALATED
+  COMPLETED
+  CANCELLED
+}
+
+model Clause {
+  id              String           @id @default(uuid())
+  clauseIndex     Int
+  clauseType      ClauseType
+  originalText    String           @db.Text
+  riskLevel       RiskLevel
+  riskFindings    Json
+  ucpArticles     String[]
+  bankRulesHit    String[]
+  confidenceScore Float
+  alternatives    Alternative[]
+  officerDecision OfficerDecision?
+  isSoftClause    Boolean          @default(false)
+  isEscalated     Boolean          @default(false)
+  escalationNote  String?
+  session         LCSession        @relation(fields: [sessionId], references: [id])
+  sessionId       String
+  feedbacks       Feedback[]
+  createdAt       DateTime         @default(now())
+}
+
+enum ClauseType {
+  CREDIT_AMOUNT
+  AVAILABILITY_TERMS
+  EXPIRY_DATE
+  SHIPMENT_TERMS
+  DOCUMENT_REQUIREMENTS
+  PAYMENT_TERMS
+  REIMBURSEMENT
+  CONFIRMATION
+  SPECIAL_CONDITIONS
+  GOVERNING_LAW
+  OTHER
+}
+
+enum RiskLevel {
+  HIGH
+  MEDIUM
+  LOW
+  COMPLIANT
+}
+
+model Alternative {
+  id         String  @id @default(uuid())
+  wording    String  @db.Text
+  rationale  String  @db.Text
+  ucpBasis   String
+  clause     Clause  @relation(fields: [clauseId], references: [id])
+  clauseId   String
+  isAccepted Boolean @default(false)
+  editedText String? @db.Text
+}
+
+model OfficerDecision {
+  id           String       @id @default(uuid())
+  decision     DecisionType
+  finalText    String?      @db.Text
+  decisionNote String?
+  decidedAt    DateTime     @default(now())
+  clause       Clause       @relation(fields: [clauseId], references: [id])
+  clauseId     String       @unique
+}
+
+enum DecisionType {
+  ACCEPTED_AI_SUGGESTION
+  EDITED_AI_SUGGESTION
+  REJECTED_WROTE_OWN
+  ACCEPTED_ORIGINAL
+  ESCALATED
+}
+
+model Feedback {
+  id        String         @id @default(uuid())
+  rating    FeedbackRating
+  comment   String?
+  user      User           @relation(fields: [userId], references: [id])
+  userId    String
+  clause    Clause         @relation(fields: [clauseId], references: [id])
+  clauseId  String
+  createdAt DateTime       @default(now())
+}
+
+enum FeedbackRating {
+  HELPFUL
+  PARTIALLY_HELPFUL
+  NOT_HELPFUL
+}
+
+model AuditLog {
+  id        String    @id @default(uuid())
+  eventType String
+  eventData Json
+  actorId   String
+  sessionId String
+  session   LCSession @relation(fields: [sessionId], references: [id])
+  createdAt DateTime  @default(now())
+}
+
+model ApiUsageLog {
+  id          String   @id @default(uuid())
+  model       String
+  tokensUsed  Int
+  latencyMs   Int
+  clauseId    String?
+  sessionId   String?
+  endpoint    String
+  createdAt   DateTime @default(now())
+}
+
+model ClauseKnowledgeChunk {
+  id         String                        @id @default(uuid())
+  source     String                        // e.g. "UCP600", "ISBP821"
+  articleRef String
+  title      String
+  content    String                        @db.Text
+  embedding  Unsupported("vector(1536)")?
+  createdAt  DateTime                      @default(now())
+}

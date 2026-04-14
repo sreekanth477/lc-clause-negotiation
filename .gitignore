@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.env.local
+.DS_Store
+*.log
+.pnpm-store/
+packages/backend/src/prisma/migrations/
+packages/frontend/dist/
+packages/shared/dist/

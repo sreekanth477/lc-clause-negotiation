@@ -1,0 +1,90 @@
+{
+  "rules": [
+    {
+      "id": "RULE_001",
+      "name": "Soft Clause Prohibition",
+      "description": "LCs must not contain clauses making payment conditional on applicant approval or documents in applicant control",
+      "severity": "HIGH",
+      "patterns": [
+        "acceptable to applicant",
+        "to applicant's satisfaction",
+        "approved by buyer",
+        "inspection certificate issued by applicant",
+        "to the satisfaction of the applicant",
+        "subject to applicant approval",
+        "applicant's inspection",
+        "buyer's approval",
+        "acceptable to buyer"
+      ]
+    },
+    {
+      "id": "RULE_002",
+      "name": "Presentation Period Minimum",
+      "description": "Presentation period must be at least 21 days after shipment as per UCP 600 Article 14(c)",
+      "severity": "HIGH",
+      "patterns": [
+        "within [0-9] days",
+        "within 1[0-9] days",
+        "within 20 days",
+        "within 5 days",
+        "within 7 days",
+        "within 10 days",
+        "within 14 days"
+      ]
+    },
+    {
+      "id": "RULE_003",
+      "name": "Ambiguous Document Description",
+      "description": "Document requirements must not use vague qualifiers",
+      "severity": "MEDIUM",
+      "patterns": [
+        "clean",
+        "satisfactory",
+        "in good order",
+        "acceptable",
+        "to the satisfaction"
+      ]
+    },
+    {
+      "id": "RULE_004",
+      "name": "Evergreen Clause",
+      "description": "Standby LCs must not contain automatic extension clauses beyond bank-approved limits",
+      "severity": "HIGH",
+      "patterns": [
+        "automatically extended",
+        "deemed renewed",
+        "unless notified",
+        "automatically renewed",
+        "evergreen",
+        "auto-renewal"
+      ]
+    },
+    {
+      "id": "RULE_005",
+      "name": "Prohibited Country Restriction",
+      "description": "LC must not name countries under active OFAC/UN sanctions as loading or discharge ports",
+      "severity": "HIGH",
+      "patterns": [
+        "Iran",
+        "North Korea",
+        "Syria",
+        "Cuba",
+        "Sudan",
+        "Libya",
+        "Yemen",
+        "Myanmar"
+      ]
+    },
+    {
+      "id": "RULE_006",
+      "name": "Tolerance Clause Check",
+      "description": "Credit amount tolerances exceeding 10% require credit approval per UCP 600 Article 30",
+      "severity": "MEDIUM",
+      "patterns": [
+        "tolerance",
+        "approximately",
+        "about"
+      ]
+    }
+  ]
+}
