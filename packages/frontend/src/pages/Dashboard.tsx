@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Eye, AlertTriangle, Clock, Activity } from 'lucide-react'
+import { Plus, Eye, AlertTriangle, Clock, Activity, Search } from 'lucide-react'
 import { api } from '../api/client'
 import { StatusIndicator } from '../components/shared/StatusIndicator'
 import { RiskBadge } from '../components/shared/RiskBadge'
@@ -23,6 +23,7 @@ export const Dashboard: React.FC = () => {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -48,6 +49,32 @@ export const Dashboard: React.FC = () => {
     0
   )
   const pendingCount = sessions.filter((s) => s.status === 'IN_REVIEW').length
+
+  // Client-side search filter
+  const filteredSessions = useMemo(() => {
+    if (!search.trim()) return sessions
+    const q = search.toLowerCase()
+    return sessions.filter(
+      (s) =>
+        s.referenceNumber.toLowerCase().includes(q) ||
+        s.applicantName.toLowerCase().includes(q) ||
+        s.lcType.toLowerCase().includes(q)
+    )
+  }, [sessions, search])
+
+  // Recent activity feed derived from sessions
+  const recentActivity = useMemo(() => {
+    return [...sessions]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5)
+      .map((s) => ({
+        id: s.id,
+        text: `LC ${s.referenceNumber} — ${s.applicantName}`,
+        sub: `${s.lcType.replace(/_/g, ' ')} · ${s.status.replace(/_/g, ' ')}`,
+        date: new Date(s.createdAt),
+        riskHigh: s.riskCounts?.HIGH ?? 0,
+      }))
+  }, [sessions])
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -99,12 +126,27 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Main area: table + activity feed */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
       {/* Sessions table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-800">
-            LC Sessions{total > 0 && <span className="ml-2 text-gray-400 text-sm font-normal">({total})</span>}
+      <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-200 flex items-center gap-3">
+          <h2 className="text-base font-semibold text-gray-800 flex-1">
+            LC Sessions
+            {total > 0 && <span className="ml-2 text-gray-400 text-sm font-normal">({total})</span>}
           </h2>
+          {/* Search */}
+          <div className="relative w-52">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search reference, applicant..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] bg-gray-50"
+            />
+          </div>
         </div>
 
         {loading ? (
@@ -120,6 +162,10 @@ export const Dashboard: React.FC = () => {
           </div>
         ) : error ? (
           <div className="px-5 py-10 text-center text-sm text-red-500">{error}</div>
+        ) : filteredSessions.length === 0 && search ? (
+          <div className="px-5 py-10 text-center text-sm text-gray-400">
+            No sessions match &ldquo;{search}&rdquo;
+          </div>
         ) : sessions.length === 0 ? (
           <div className="px-5 py-12 text-center">
             <p className="text-gray-500 text-sm">No LC sessions yet.</p>
@@ -145,7 +191,7 @@ export const Dashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {sessions.map((session) => (
+                {filteredSessions.map((session) => (
                   <tr key={session.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-3 font-mono text-xs text-[#1e3a5f] font-semibold">
                       {session.referenceNumber}
@@ -204,6 +250,55 @@ export const Dashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Recent Activity Feed */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-200">
+          <h2 className="text-base font-semibold text-gray-800">Recent Activity</h2>
+        </div>
+        {loading ? (
+          <div className="divide-y divide-gray-100">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="px-5 py-4 flex gap-3 animate-pulse">
+                <div className="w-8 h-8 rounded-full bg-gray-200 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-gray-200 rounded w-3/4" />
+                  <div className="h-2 bg-gray-100 rounded w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : recentActivity.length === 0 ? (
+          <div className="px-5 py-10 text-center text-sm text-gray-400">
+            No activity yet
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {recentActivity.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => navigate(`/lc/${item.id}/review`)}
+                className="w-full text-left px-5 py-3.5 hover:bg-gray-50 transition-colors flex items-start gap-3"
+              >
+                {/* Dot indicator */}
+                <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                  item.riskHigh > 0 ? 'bg-red-500' : 'bg-green-400'
+                }`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-800 truncate">{item.text}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{item.sub}</p>
+                </div>
+                <span className="text-xs text-gray-400 flex-shrink-0 mt-0.5">
+                  {item.date.toLocaleDateString()}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      </div> {/* end main grid */}
     </div>
   )
 }

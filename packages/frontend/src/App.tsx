@@ -6,7 +6,8 @@ import {
   Navigate,
   useNavigate,
 } from 'react-router-dom'
-import { Shield, Loader2, AlertCircle } from 'lucide-react'
+import { Shield, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { ToastProvider } from './components/shared/Toast'
 import { AppShell } from './components/layout/AppShell'
 import { Dashboard } from './pages/Dashboard'
 import { NewLCReview } from './pages/NewLCReview'
@@ -49,6 +50,7 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -123,16 +125,27 @@ const LoginPage: React.FC = () => {
               >
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
-                required
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
+                  required
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -153,7 +166,13 @@ const LoginPage: React.FC = () => {
           </form>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
+        {/* Demo hint */}
+        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700">
+          <p className="font-semibold mb-1">Demo credentials</p>
+          <p>trade.rm@bank.com / <span className="font-mono">password123</span></p>
+          <p>compliance@bank.com / <span className="font-mono">password123</span></p>
+        </div>
+        <p className="text-center text-xs text-gray-400 mt-4">
           LC Clause Negotiation Copilot &copy; {new Date().getFullYear()}
         </p>
       </div>
@@ -165,6 +184,7 @@ const LoginPage: React.FC = () => {
 
 const App: React.FC = () => {
   return (
+    <ToastProvider>
     <BrowserRouter>
       <Routes>
         {/* Public */}
@@ -201,7 +221,9 @@ const App: React.FC = () => {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
+    </ToastProvider>
   )
 }
 
 export default App
+

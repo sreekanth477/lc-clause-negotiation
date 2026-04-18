@@ -13,8 +13,10 @@ import {
   AlertTriangle,
   FileText,
   Loader2,
+  ShieldCheck,
 } from 'lucide-react'
 import { RiskLevel, DecisionType, FeedbackRating } from '@lc-copilot/shared'
+import { useToast } from '../components/shared/Toast'
 import { useLCSession } from '../hooks/useLCSession'
 import { useClauseReview } from '../hooks/useClauseReview'
 import { useLCStore } from '../store/lcStore'
@@ -35,10 +37,10 @@ function formatClauseType(t: string) {
   return t.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-const severityIcon = (sev: 'HIGH' | 'MEDIUM' | 'LOW') => {
-  if (sev === 'HIGH') return <span className="text-red-600 font-bold">●</span>
-  if (sev === 'MEDIUM') return <span className="text-amber-500 font-bold">●</span>
-  return <span className="text-yellow-500 font-bold">●</span>
+const FINDING_STYLE: Record<'HIGH' | 'MEDIUM' | 'LOW', { border: string; bg: string; dot: string; label: string }> = {
+  HIGH:   { border: 'border-l-red-500',   bg: 'bg-red-50',   dot: 'bg-red-500',   label: 'text-red-700' },
+  MEDIUM: { border: 'border-l-amber-500', bg: 'bg-amber-50', dot: 'bg-amber-500', label: 'text-amber-700' },
+  LOW:    { border: 'border-l-yellow-500',bg: 'bg-yellow-50',dot: 'bg-yellow-500',label: 'text-yellow-700' },
 }
 
 export const ClauseReview: React.FC = () => {
@@ -60,6 +62,7 @@ export const ClauseReview: React.FC = () => {
     decisions,
   } = useLCStore()
 
+  const { success: toastSuccess, error: toastError } = useToast()
   const [decisionMode, setDecisionMode] = useState<DecisionMode>('none')
   const [editText, setEditText] = useState('')
   const [escalateNote, setEscalateNote] = useState('')
@@ -100,8 +103,9 @@ export const ClauseReview: React.FC = () => {
       recordDecision(activeClause.id, { decision: type, finalText, decisionNote: note })
       setDecisionMode('none')
       setEditText('')
+      toastSuccess('Decision recorded', `Clause ${activeClause.clauseIndex + 1} marked as ${type.replace(/_/g, ' ').toLowerCase()}.`)
     } catch {
-      // error handling could be added here
+      toastError('Failed to save decision', 'Please try again.')
     } finally {
       setSubmittingDecision(false)
     }
@@ -115,8 +119,9 @@ export const ClauseReview: React.FC = () => {
       markEscalated(activeClause.id, escalateNote.trim())
       setDecisionMode('none')
       setEscalateNote('')
+      toastSuccess('Clause escalated', 'Compliance officer has been notified.')
     } catch {
-      // error handling
+      toastError('Escalation failed', 'Please try again.')
     } finally {
       setSubmittingDecision(false)
     }
@@ -137,10 +142,13 @@ export const ClauseReview: React.FC = () => {
     setDecisionMode('edit')
   }
 
-  const filterButtons: { mode: FilterMode; label: string }[] = [
-    { mode: 'ALL', label: 'All' },
-    { mode: 'HIGH', label: 'High Risk' },
-    { mode: 'UNACTIONED', label: 'Unactioned' },
+  const highCount       = clauses.filter((c) => c.riskLevel === RiskLevel.HIGH).length
+  const unactionedCount = clauses.filter((c) => !c.decision && !c.isEscalated).length
+
+  const filterButtons: { mode: FilterMode; label: string; count: number }[] = [
+    { mode: 'ALL',       label: 'All',       count: clauses.length },
+    { mode: 'HIGH',      label: 'High Risk', count: highCount },
+    { mode: 'UNACTIONED',label: 'Unactioned',count: unactionedCount },
   ]
 
   if (loading) {
@@ -190,18 +198,21 @@ export const ClauseReview: React.FC = () => {
 
         {/* Filter */}
         <div className="px-4 py-2 border-b border-gray-100 flex gap-1">
-          {filterButtons.map(({ mode, label }) => (
+          {filterButtons.map(({ mode, label, count }) => (
             <button
               key={mode}
               type="button"
               onClick={() => setFilterMode(mode)}
-              className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors ${
+              className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors flex flex-col items-center leading-tight ${
                 filterMode === mode
                   ? 'bg-[#1e3a5f] text-white'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
-              {label}
+              <span>{label}</span>
+              <span className={`text-[10px] font-bold ${filterMode === mode ? 'text-blue-200' : 'text-gray-400'}`}>
+                {count}
+              </span>
             </button>
           ))}
         </div>
@@ -383,20 +394,29 @@ export const ClauseReview: React.FC = () => {
                 </div>
               </div>
 
-              {/* Risk findings */}
+              {/* Risk findings — color-coded left-border cards */}
               {activeClause.findings && activeClause.findings.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-xl p-5">
                   <h4 className="text-sm font-semibold text-gray-700 mb-3">Risk Findings</h4>
-                  <div className="space-y-3">
-                    {activeClause.findings.map((f, i) => (
-                      <div key={i} className="flex items-start gap-2.5">
-                        <span className="flex-shrink-0 mt-0.5">{severityIcon(f.severity)}</span>
-                        <div>
+                  <div className="space-y-2.5">
+                    {activeClause.findings.map((f, i) => {
+                      const sty = FINDING_STYLE[f.severity] ?? FINDING_STYLE.LOW
+                      return (
+                        <div
+                          key={i}
+                          className={`border-l-4 ${sty.border} ${sty.bg} rounded-r-lg px-3 py-2.5`}
+                        >
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${sty.dot}`} />
+                            <span className={`text-xs font-bold uppercase tracking-wide ${sty.label}`}>
+                              {f.severity}
+                            </span>
+                          </div>
                           <p className="text-sm font-medium text-gray-800">{f.issue}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{f.explanation}</p>
+                          <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{f.explanation}</p>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -430,8 +450,30 @@ export const ClauseReview: React.FC = () => {
               <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
                 <h4 className="text-sm font-semibold text-gray-700">Decision</h4>
 
+                {/* COMPLIANT notice */}
+                {activeClause.riskLevel === RiskLevel.COMPLIANT && !activeClause.decision && (
+                  <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-2">
+                    <ShieldCheck className="w-5 h-5 text-green-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-green-800">Fully Compliant</p>
+                      <p className="text-xs text-green-600 mt-0.5">This clause is aligned with UCP 600 and bank policy. No action required.</p>
+                    </div>
+                  </div>
+                )}
+
                 {decisionMode === 'none' && !activeClause.decision && !activeClause.isEscalated && (
                   <div className="flex flex-wrap gap-2">
+                    {activeClause.riskLevel === RiskLevel.COMPLIANT ? (
+                      <button
+                        type="button"
+                        onClick={() => submitDecision(DecisionType.ACCEPTED_ORIGINAL)}
+                        disabled={submittingDecision}
+                        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        Accept Original — No Change
+                      </button>
+                    ) : (
                     <button
                       type="button"
                       onClick={() =>
@@ -479,6 +521,7 @@ export const ClauseReview: React.FC = () => {
                       <ArrowUp className="w-4 h-4" />
                       Escalate
                     </button>
+                    )}
                   </div>
                 )}
 

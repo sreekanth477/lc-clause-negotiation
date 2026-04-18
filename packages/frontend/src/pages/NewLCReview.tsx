@@ -176,38 +176,50 @@ export const NewLCReview: React.FC = () => {
           <h2 className="text-base font-semibold text-gray-800 mb-6 text-center">
             Processing your LC...
           </h2>
-          <div className="space-y-4">
-            {steps.map((step, i) => (
-              <div key={i} className="flex items-center gap-4">
-                <div className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0">
-                  {step.status === 'loading' && (
-                    <Loader2 className="w-5 h-5 text-[#1e3a5f] animate-spin" />
-                  )}
-                  {step.status === 'done' && (
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                  )}
-                  {step.status === 'error' && (
-                    <AlertCircle className="w-5 h-5 text-red-500" />
-                  )}
-                  {step.status === 'pending' && (
-                    <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
-                  )}
-                </div>
-                <span
-                  className={`text-sm font-medium ${
+          <div className="relative">
+            {/* Vertical connecting line */}
+            <div className="absolute left-[15px] top-8 bottom-8 w-px bg-gray-200 z-0" />
+
+            <div className="space-y-6 relative z-10">
+              {steps.map((step, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  {/* Step icon */}
+                  <div className={`w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 border-2 transition-all ${
                     step.status === 'done'
-                      ? 'text-green-600'
+                      ? 'bg-green-500 border-green-500'
                       : step.status === 'loading'
-                      ? 'text-[#1e3a5f]'
+                      ? 'bg-white border-[#1e3a5f]'
                       : step.status === 'error'
-                      ? 'text-red-500'
+                      ? 'bg-red-50 border-red-400'
+                      : 'bg-white border-gray-300'
+                  }`}>
+                    {step.status === 'loading' && <Loader2 className="w-4 h-4 text-[#1e3a5f] animate-spin" />}
+                    {step.status === 'done'    && <CheckCircle className="w-5 h-5 text-white" />}
+                    {step.status === 'error'   && <AlertCircle className="w-4 h-4 text-red-500" />}
+                    {step.status === 'pending' && (
+                      <span className="w-2.5 h-2.5 rounded-full bg-gray-300" />
+                    )}
+                  </div>
+
+                  <div>
+                    <p className={`text-sm font-semibold ${
+                      step.status === 'done'    ? 'text-green-700'
+                      : step.status === 'loading' ? 'text-[#1e3a5f]'
+                      : step.status === 'error'   ? 'text-red-500'
                       : 'text-gray-400'
-                  }`}
-                >
-                  {step.label}
-                </span>
-              </div>
-            ))}
+                    }`}>
+                      {step.label}
+                    </p>
+                    {step.status === 'loading' && (
+                      <p className="text-xs text-gray-400 mt-0.5">In progress...</p>
+                    )}
+                    {step.status === 'done' && (
+                      <p className="text-xs text-green-500 mt-0.5">Complete</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
           {error && (
             <div className="mt-5 flex items-start gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">

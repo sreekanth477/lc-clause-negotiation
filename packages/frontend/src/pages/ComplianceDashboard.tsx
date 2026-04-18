@@ -4,6 +4,7 @@ import {
   Line,
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -11,6 +12,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+import { RefreshCw } from 'lucide-react'
 import { ShieldOff, Loader2, Check, X } from 'lucide-react'
 import { UserRole } from '@lc-copilot/shared'
 import { api } from '../api/client'
@@ -44,6 +46,7 @@ export const ComplianceDashboard: React.FC = () => {
   const [data, setData] = useState<ComplianceDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
   const [resolveModal, setResolveModal] = useState<ResolveModalState | null>(null)
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set())
 
@@ -54,6 +57,7 @@ export const ComplianceDashboard: React.FC = () => {
       try {
         const result = await api.compliance.getDashboard()
         setData(result)
+        setLastRefreshed(new Date())
       } catch {
         setError('Failed to load compliance dashboard.')
       } finally {
@@ -122,51 +126,86 @@ export const ComplianceDashboard: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">Compliance Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          AI performance metrics, escalations, and risk trends
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Compliance Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            AI performance metrics, escalations, and risk trends
+          </p>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {lastRefreshed && (
+            <span className="text-xs text-gray-400">
+              Last refreshed: {lastRefreshed.toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true)
+              api.compliance.getDashboard()
+                .then((r) => { setData(r); setLastRefreshed(new Date()) })
+                .catch(() => setError('Refresh failed.'))
+                .finally(() => setLoading(false))
+            }}
+            className="flex items-center gap-1.5 text-xs text-[#1e3a5f] border border-[#1e3a5f] px-3 py-1.5 rounded-lg hover:bg-[#1e3a5f] hover:text-white transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Section 1: AI Performance Metrics */}
       <section>
         <h2 className="text-base font-semibold text-gray-700 mb-3">AI Performance Metrics</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[
             {
               label: 'Avg Confidence',
               value: `${Math.round(metrics.averageConfidenceScore * 100)}%`,
-              sub: `${metrics.totalAnalyses} analyses`,
+              sub: `${metrics.totalAnalyses} analyses run`,
               color: 'text-[#1e3a5f]',
               bg: 'bg-blue-50',
+              border: 'border-blue-200',
             },
             {
               label: 'Acceptance Rate',
               value: `${Math.round(metrics.acceptanceRate * 100)}%`,
-              sub: 'AI suggestions accepted',
+              sub: 'AI suggestion accepted as-is',
               color: 'text-green-700',
               bg: 'bg-green-50',
+              border: 'border-green-200',
             },
             {
               label: 'Edit Rate',
               value: `${Math.round(metrics.editRate * 100)}%`,
-              sub: 'suggestions edited',
+              sub: 'suggestion edited before accept',
               color: 'text-amber-700',
               bg: 'bg-amber-50',
+              border: 'border-amber-200',
             },
             {
               label: 'Rejection Rate',
               value: `${Math.round(metrics.rejectionRate * 100)}%`,
-              sub: 'officer wrote own',
+              sub: 'officer wrote own wording',
               color: 'text-red-700',
               bg: 'bg-red-50',
+              border: 'border-red-200',
             },
-          ].map(({ label, value, sub, color, bg }) => (
-            <div key={label} className={`${bg} border border-gray-200 rounded-xl p-5`}>
+            {
+              label: 'Escalation Rate',
+              value: `${Math.round(metrics.escalationRate * 100)}%`,
+              sub: 'referred to compliance',
+              color: 'text-orange-700',
+              bg: 'bg-orange-50',
+              border: 'border-orange-200',
+            },
+          ].map(({ label, value, sub, color, bg, border }) => (
+            <div key={label} className={`${bg} border ${border} rounded-xl p-4`}>
               <p className={`text-2xl font-bold ${color}`}>{value}</p>
               <p className="text-sm font-medium text-gray-700 mt-0.5">{label}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
+              <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{sub}</p>
             </div>
           ))}
         </div>
@@ -289,11 +328,11 @@ export const ComplianceDashboard: React.FC = () => {
               <BarChart data={feedbackChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <Tooltip formatter={(v) => [v, 'Responses']} />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {feedbackChartData.map((entry, i) => (
-                    <rect key={i} fill={entry.fill} />
+                    <Cell key={i} fill={entry.fill} />
                   ))}
                 </Bar>
               </BarChart>
