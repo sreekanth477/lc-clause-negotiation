@@ -118,7 +118,34 @@ export async function getSessionById(
   return session;
 }
 
-export async function updateSessionStatus(id: string, status: SessionStatus) {
+/**
+ * Ensures the caller is allowed to act on the given session.
+ * TRADE_RM may only touch sessions they own; COMPLIANCE_OFFICER and ADMIN
+ * may touch any session.
+ */
+export async function assertSessionAccess(
+  sessionId: string,
+  officerId: string,
+  role: UserRole
+) {
+  const session = await prisma.lCSession.findUnique({
+    where: { id: sessionId },
+    select: { id: true, officerId: true },
+  });
+  if (!session) throw Object.assign(new Error('Session not found'), { statusCode: 404 });
+  if (role === UserRole.TRADE_RM && session.officerId !== officerId) {
+    throw Object.assign(new Error('Access denied'), { statusCode: 403 });
+  }
+  return session;
+}
+
+export async function updateSessionStatus(
+  id: string,
+  status: SessionStatus,
+  officerId: string,
+  role: UserRole
+) {
+  await assertSessionAccess(id, officerId, role);
   return prisma.lCSession.update({
     where: { id },
     data: { status },
@@ -127,8 +154,11 @@ export async function updateSessionStatus(id: string, status: SessionStatus) {
 
 export async function parseSessionClauses(
   sessionId: string,
-  officerId: string
+  officerId: string,
+  role: UserRole
 ): Promise<ParsedClause[]> {
+  await assertSessionAccess(sessionId, officerId, role);
+
   const session = await prisma.lCSession.findUnique({
     where: { id: sessionId },
   });
@@ -180,8 +210,11 @@ export async function parseSessionClauses(
 export async function analyseSessionClauses(
   sessionId: string,
   officerId: string,
+  role: UserRole,
   res: Response
 ): Promise<void> {
+  await assertSessionAccess(sessionId, officerId, role);
+
   // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');

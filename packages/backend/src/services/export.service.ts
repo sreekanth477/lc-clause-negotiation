@@ -15,6 +15,21 @@ import {
 
 const prisma = new PrismaClient();
 
+/**
+ * Escape HTML special characters to prevent injection when user-controlled
+ * fields (applicantName, referenceNumber, officer name, risk findings) are
+ * interpolated into the report template.
+ */
+function esc(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function getSessionWithClauses(sessionId: string) {
   return prisma.lCSession.findUnique({
     where: { id: sessionId },
@@ -55,11 +70,11 @@ function buildReportHTML(session: Awaited<ReturnType<typeof getSessionWithClause
           ? '#ca8a04'
           : '#16a34a';
       return `<tr>
-        <td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${c.clauseIndex}</td>
-        <td style="padding:8px;border:1px solid #e5e7eb;">${c.clauseType.replace(/_/g, ' ')}</td>
-        <td style="padding:8px;border:1px solid #e5e7eb;color:${riskColor};font-weight:bold;">${c.riskLevel}${c.isSoftClause ? ' ⚠' : ''}</td>
-        <td style="padding:8px;border:1px solid #e5e7eb;font-size:12px;">${findings}</td>
-        <td style="padding:8px;border:1px solid #e5e7eb;">${c.officerDecision?.decision?.replace(/_/g, ' ') ?? 'Pending'}</td>
+        <td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${esc(c.clauseIndex)}</td>
+        <td style="padding:8px;border:1px solid #e5e7eb;">${esc(c.clauseType.replace(/_/g, ' '))}</td>
+        <td style="padding:8px;border:1px solid #e5e7eb;color:${riskColor};font-weight:bold;">${esc(c.riskLevel)}${c.isSoftClause ? ' &#9888;' : ''}</td>
+        <td style="padding:8px;border:1px solid #e5e7eb;font-size:12px;">${esc(findings)}</td>
+        <td style="padding:8px;border:1px solid #e5e7eb;">${esc(c.officerDecision?.decision?.replace(/_/g, ' ') ?? 'Pending')}</td>
       </tr>`;
     })
     .join('');
@@ -100,12 +115,12 @@ function buildReportHTML(session: Awaited<ReturnType<typeof getSessionWithClause
   </div>
   <div class="content">
     <div class="meta-grid">
-      <div class="meta-item"><label>LC Reference</label><span>${session.referenceNumber}</span></div>
-      <div class="meta-item"><label>Applicant</label><span>${session.applicantName}</span></div>
-      <div class="meta-item"><label>LC Type</label><span>${session.lcType}</span></div>
-      <div class="meta-item"><label>Reviewing Officer</label><span>${session.officer.name}</span></div>
-      <div class="meta-item"><label>Report Date</label><span>${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div>
-      <div class="meta-item"><label>Status</label><span>${session.status}</span></div>
+      <div class="meta-item"><label>LC Reference</label><span>${esc(session.referenceNumber)}</span></div>
+      <div class="meta-item"><label>Applicant</label><span>${esc(session.applicantName)}</span></div>
+      <div class="meta-item"><label>LC Type</label><span>${esc(session.lcType)}</span></div>
+      <div class="meta-item"><label>Reviewing Officer</label><span>${esc(session.officer.name)}</span></div>
+      <div class="meta-item"><label>Report Date</label><span>${esc(new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }))}</span></div>
+      <div class="meta-item"><label>Status</label><span>${esc(session.status)}</span></div>
     </div>
     <h2>Risk Summary</h2>
     <div class="risk-cards">
@@ -121,7 +136,7 @@ function buildReportHTML(session: Awaited<ReturnType<typeof getSessionWithClause
     </table>
   </div>
   <div class="footer">
-    Generated: ${new Date().toISOString()} | Session ID: ${session.id} | System: LC Clause Negotiation Copilot
+    Generated: ${esc(new Date().toISOString())} | Session ID: ${esc(session.id)} | System: LC Clause Negotiation Copilot
   </div>
 </body>
 </html>`;
@@ -142,7 +157,20 @@ export async function exportToPDF(sessionId: string): Promise<Buffer> {
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    // Defense-in-depth: the report is static HTML — disable JS and block all
+    // outbound requests so any residual injection cannot reach the network
+    // (e.g. cloud instance metadata) from inside the backend host.
+    await page.setJavaScriptEnabled(false);
+    await page.setRequestInterception(true);
+    page.on('request', (reqIntercept) => {
+      const url = reqIntercept.url();
+      if (url.startsWith('data:') || url.startsWith('about:')) {
+        reqIntercept.continue();
+      } else {
+        reqIntercept.abort();
+      }
+    });
+    await page.setContent(html, { waitUntil: 'load' });
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,

@@ -8,10 +8,11 @@ import {
   parseSessionClauses,
   analyseSessionClauses,
   updateSessionStatus,
+  assertSessionAccess,
 } from '../services/lcSession.service';
 import { generateReport } from '../agents/reportGenerator.agent';
 import { exportToPDF, exportToDOCX } from '../services/export.service';
-import { CreateLCSessionSchema, UserRole, SessionStatus } from '@lc-copilot/shared';
+import { CreateLCSessionSchema, SessionStatusSchema } from '@lc-copilot/shared';
 
 const router = Router();
 router.use(authenticate);
@@ -57,7 +58,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction): Prom
 // POST /api/lc/sessions/:id/parse
 router.post('/:id/parse', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const clauses = await parseSessionClauses(req.params.id, req.user!.userId);
+    const clauses = await parseSessionClauses(req.params.id, req.user!.userId, req.user!.role);
     res.json({ clauses });
   } catch (error) {
     next(error);
@@ -67,7 +68,7 @@ router.post('/:id/parse', async (req: Request, res: Response, next: NextFunction
 // POST /api/lc/sessions/:id/analyse  (SSE)
 router.post('/:id/analyse', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    await analyseSessionClauses(req.params.id, req.user!.userId, res);
+    await analyseSessionClauses(req.params.id, req.user!.userId, req.user!.role, res);
   } catch (error) {
     next(error);
   }
@@ -76,8 +77,13 @@ router.post('/:id/analyse', async (req: Request, res: Response, next: NextFuncti
 // PATCH /api/lc/sessions/:id/status
 router.patch('/:id/status', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { status } = req.body as { status: SessionStatus };
-    const session = await updateSessionStatus(req.params.id, status);
+    const status = SessionStatusSchema.parse(req.body?.status);
+    const session = await updateSessionStatus(
+      req.params.id,
+      status,
+      req.user!.userId,
+      req.user!.role
+    );
     res.json(session);
   } catch (error) {
     next(error);
@@ -133,6 +139,7 @@ router.get('/:id/report', async (req: Request, res: Response, next: NextFunction
 // GET /api/lc/sessions/:id/export/pdf
 router.get('/:id/export/pdf', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    await assertSessionAccess(req.params.id, req.user!.userId, req.user!.role);
     const pdfBuffer = await exportToPDF(req.params.id);
     await logAuditEvent(req.params.id, req.user!.userId, AuditEventType.EXPORT_DOWNLOADED, { format: 'pdf' });
     res.setHeader('Content-Type', 'application/pdf');
@@ -146,6 +153,7 @@ router.get('/:id/export/pdf', async (req: Request, res: Response, next: NextFunc
 // GET /api/lc/sessions/:id/export/docx
 router.get('/:id/export/docx', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    await assertSessionAccess(req.params.id, req.user!.userId, req.user!.role);
     const docxBuffer = await exportToDOCX(req.params.id);
     await logAuditEvent(req.params.id, req.user!.userId, AuditEventType.EXPORT_DOWNLOADED, { format: 'docx' });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
