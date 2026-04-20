@@ -474,6 +474,7 @@ export const ClauseReview: React.FC = () => {
                         Accept Original — No Change
                       </button>
                     ) : (
+                    <>
                     <button
                       type="button"
                       onClick={() =>
@@ -521,6 +522,7 @@ export const ClauseReview: React.FC = () => {
                       <ArrowUp className="w-4 h-4" />
                       Escalate
                     </button>
+                    </>
                     )}
                   </div>
                 )}

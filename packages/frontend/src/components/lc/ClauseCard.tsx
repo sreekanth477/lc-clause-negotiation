@@ -42,22 +42,19 @@ export const ClauseCard: React.FC<ClauseCardProps> = ({ clause, isActive, onClic
               {typeLabel(clause.clauseType)}
             </span>
             {clause.isSoftClause && (
-              <AlertTriangle
-                className="w-3.5 h-3.5 text-amber-500 flex-shrink-0"
-                title="Soft clause"
-              />
+              <span title="Soft clause" className="flex">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+              </span>
             )}
             {isEscalated && (
-              <ArrowUp
-                className="w-3.5 h-3.5 text-orange-500 flex-shrink-0"
-                title="Escalated"
-              />
+              <span title="Escalated" className="flex">
+                <ArrowUp className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+              </span>
             )}
             {hasDecision && (
-              <CheckCircle
-                className="w-3.5 h-3.5 text-green-500 flex-shrink-0"
-                title="Actioned"
-              />
+              <span title="Actioned" className="flex">
+                <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+              </span>
             )}
           </div>
 

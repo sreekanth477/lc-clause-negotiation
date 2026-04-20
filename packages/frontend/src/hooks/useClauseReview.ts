@@ -54,11 +54,10 @@ export function useClauseReview(sessionId: string): UseClauseReviewResult {
           // ClauseAnalysisSSEEvent
           const evt = data as ClauseAnalysisSSEEvent
           updateClauseAnalysis(evt.clauseId, evt.analysis, evt.alternatives)
-          setAnalysisProgress((prev) => ({
-            ...prev,
-            completed: (prev?.completed ?? 0) + 1,
+          setAnalysisProgress({
+            completed: (analysisProgress?.completed ?? 0) + 1,
             status: 'analysing',
-          }))
+          })
         }
       } catch {
         // Ignore parse errors
